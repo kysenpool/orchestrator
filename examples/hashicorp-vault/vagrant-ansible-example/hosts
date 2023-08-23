@@ -1,0 +1,13 @@
+default ansible_connection=local
+[local]
+127.0.0.1
+
+[local:vars]
+ansible_connection=local
+
+[vaultservers]
+127.0.0.1
+
+[vaultservers:vars]
+vault_version=1.13.3
+

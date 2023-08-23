@@ -1,0 +1,73 @@
+---
+  - name: Install unzip
+    package:
+      name: unzip
+      update_cache: yes
+    become: true
+
+  - name: Download and install vault binary
+    unarchive:
+      src: "https://releases.hashicorp.com/vault/{{ vault_version }}/vault_{{ vault_version }}_linux_amd64.zip"
+      dest: /usr/bin/
+      remote_src: True
+    become: true
+
+  - name: Create unseal directories
+    file:
+      path: "{{ unseal_keys_dir_output }}"
+      state: directory
+    delegate_to: localhost
+
+  - name: Create root key directories
+    file:
+      path: "{{ root_token_dir_output }}"
+      state: directory
+    delegate_to: localhost
+
+  - name: Create vault config directory
+    file: state=directory path=/etc/opt/vault/
+    become: true
+
+  - name: Copy vault config to server
+    copy: src=vaultconfig.hcl dest=/etc/opt/vault/
+    become: true
+
+  - name: Copy vault service to server
+    copy: src=vault.service dest=/etc/systemd/system/vault.service
+    become: true
+
+  - name: Start vault service
+    systemd:
+      state: started
+      name: vault
+      daemon_reload: yes
+    become: true
+
+  - pause:
+      seconds: 15
+
+  - name: Initialize the vault
+    command: vault operator init -key-shares=5 -key-threshold=3 -format json
+    register: keys
+    environment:
+      VAULT_ADDR: "http://127.0.0.1:8200"
+
+
+  - name: Parse output of vault init
+    set_fact:
+      vault_init_parsed: "{{ keys.stdout | from_json }}"
+
+  - name: Write unseal keys to files
+    copy:
+      dest: "{{ unseal_keys_dir_output }}/unseal_key_{{ item.0 }}"
+      content: "{{ item.1 }}"
+    with_indexed_items: "{{ vault_init_parsed.unseal_keys_hex }}"
+    delegate_to: localhost
+
+  - name: Write root token to file
+    copy:
+      content: "{{ vault_init_parsed.root_token }}"
+      dest: "{{root_token_dir_output}}/rootkey"
+    delegate_to: localhost
+
+  - debug: msg="{{ keys }}"

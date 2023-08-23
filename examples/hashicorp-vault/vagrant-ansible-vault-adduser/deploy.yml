@@ -1,0 +1,6 @@
+---
+- hosts: vaultservers
+
+  roles:
+    - vault-adduser
+

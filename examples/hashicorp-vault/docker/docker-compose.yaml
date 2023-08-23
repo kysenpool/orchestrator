@@ -1,0 +1,21 @@
+version: "3.8"
+services:
+  vault-server:
+    image: vault:1.13.3
+    ports:
+      - "8300:8300"
+    environment:
+      VAULT_ADDR: "http://0.0.0.0:8300"
+      VAULT_API_ADDR: "http://127.0.0.1:8300"
+      VAULT_CLUSTER_ADDR: "http://127.0.0.1:8301"
+      VAULT_DEV_ROOT_TOKEN_ID: "vault-plaintext-root-token"
+    volumes:
+      - "./config/:/vault/config/"
+    cap_add:
+      - IPC_LOCK
+  vault-client:
+    build: .
+    environment:
+      VAULT_ADDR: "http://vault-server:8300"
+networks:
+  vault-network:

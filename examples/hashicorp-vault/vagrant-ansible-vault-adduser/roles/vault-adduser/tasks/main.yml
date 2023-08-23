@@ -1,0 +1,37 @@
+---
+#  - name: Echo
+#    command: echo '$ROOT_VAULT_TOKEN'
+#    register: echoed
+#    environment:
+#      ROOT_VAULT_TOKEN: '{{ vault_root_key }}'
+#  - debug: msg="{{ echoed.stdout }}"
+
+
+  - name: Copy script
+    copy: src=run.sh dest=/vagrant # change destination if node were not provisioned by prev step with vagrant
+
+  - name: Changing perm of "/vagrant/run.sh", adding "+x"
+    file: dest=/vagrant/run.sh mode=a+x
+
+  - name: Apt update
+    command: apt-get update
+    become: true
+
+  - name: Install additional binaries
+    command: apt-get install -y jq openssh-client software-properties-common curl gnupg2
+    become: true
+
+  - name: Add User
+    command: /vagrant/run.sh
+    environment:
+      ROOT_VAULT_TOKEN: '{{ vault_root_key }}'
+      VAULT_ADDRESS: "http://127.0.0.1:8200"
+      VAULT_ADDR: "http://127.0.0.1:8200"
+    register: add_user
+
+  - name: Delete run_sh
+    ansible.builtin.file:
+      state: absent
+      path: /vagrant/run.sh
+
+  - debug: msg="{{ add_user.stdout }}"

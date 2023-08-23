@@ -1,0 +1,5 @@
+.vagrant/
+rootKey/
+unsealKey/
+*.log
+.env
