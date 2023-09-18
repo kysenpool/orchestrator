@@ -1,0 +1,62 @@
+---
+- name: Stop node process
+  become: true
+  ansible.builtin.systemd:
+    name: '{{ network }}'
+    state: stopped
+    enabled: false
+  ignore_errors: true
+  register: ignore_errors_register
+
+- name: Remove project git folder
+  ansible.builtin.file:
+    path: '{{ user_dir }}/{{ network }}'
+    state: absent
+
+- name: Remove node data folder
+  ansible.builtin.file:
+    path: '{{ user_dir }}/{{ folder }}'
+    state: absent
+
+- name: Remove systemd file
+  become: true
+  ansible.builtin.file:
+    path: /etc/systemd/system/{{ network }}.service
+    state: absent
+
+- name: Remove binary from go bin
+  ansible.builtin.file:
+    path: '{{ user_dir }}/{{ daemon }}'
+    state: absent
+
+- name: Remove genesis file, snapshot file, state sync file and resync files
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: absent
+  loop:
+    - '{{ user_dir }}/snapshot/{{ network }}.sh'
+    - '{{ user_dir }}/genesis/{{ network }}.sh'
+    - '{{ user_dir }}/state_sync/{{ network }}.sh'
+    - '{{ user_dir }}/state_sync/resync/{{ network }}_recover.sh'
+    - '{{ user_dir }}/state_sync/resync/{{ network }}_resync.sh'
+
+- name: Remove nginx files
+  become: true
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: absent
+  loop:
+    - /etc/nginx/sites-enabled/{{ network }}-api
+    - /etc/nginx/sites-enabled/{{ network }}-rpc
+
+- name: Remove snapshot cronjob
+  ansible.builtin.cron:
+    user: '{{ ansible_user }}'
+    name: '{{ network }} snapshot'
+    state: absent
+
+- name: Remove resync cronjob
+  ansible.builtin.cron:
+    user: '{{ ansible_user }}'
+    name: '{{ network }} resync'
+    state: absent

@@ -1,0 +1,124 @@
+---
+
+- name: Cleanup genesis
+  ansible.builtin.file:
+    path: '{{ user_dir }}/{{ folder }}/config/genesis.json'
+    state: absent
+
+- name: Initialize Node
+  ansible.builtin.command: '{{ user_dir }}/{{ folder }}/bin/{{ daemon }} init {{ node_name }} --chain-id {{ chain_id }}'
+  register: output
+  changed_when: output.rc != 0
+
+- name: Download config file
+  ansible.builtin.get_url:
+    url: '{{ config_file }}'
+    dest: '{{ user_dir }}/{{ folder }}/config/config.toml'
+    mode: '0644'
+  when: config_file is defined
+
+- name: Download app file
+  ansible.builtin.get_url:
+    url: '{{ app_file }}'
+    dest: '{{ user_dir }}/{{ folder }}/config/app.toml'
+    mode: '0644'
+  when: app_file is defined
+
+
+- name: Download addrbook.json file
+  ansible.builtin.get_url:
+    url: '{{ addrbook_file }}'
+    dest: '{{ user_dir }}/{{ folder }}/config/addrbook.json'
+    mode: '0644'
+  when: addrbook_file is defined
+- name: Base64Decode config file
+  ansible.builtin.shell: |
+    set -o pipefail && echo {{ config_file_base64 }} | base64 --decode > {{ user_dir }}/{{ folder }}/config/config.toml && chmod 0644 {{ user_dir }}/{{ folder }}/config/config.toml
+  when: config_file_base64 is defined
+  register: base64_output
+  changed_when: base64_output.rc != 0
+  args:
+    executable: /usr/bin/bash
+
+- name: Base64Decode app file
+  ansible.builtin.shell: |
+    set -o pipefail && echo {{ app_file_base64 }} | base64 --decode > {{ user_dir }}/{{ folder }}/config/config.toml && chmod 0644 {{ user_dir }}/{{ folder }}/config/app.toml
+  when: app_file_base64 is defined
+  register: app_file_base64_output
+  changed_when: app_file_base64_output.rc != 0
+  args:
+    executable: /usr/bin/bash
+
+
+- name: Create config dir
+  ansible.builtin.file:
+    path: '{{ user_dir }}/{{ folder }}/config'
+    state: directory
+    mode: '0644'
+
+- name: Template config file
+  ansible.builtin.template:
+    src: config.toml.j2
+    dest: '{{ user_dir }}/{{ folder }}/config/config.toml'
+    mode: '0644'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+
+
+- name: Template app file
+  ansible.builtin.template:
+    src: app.toml.j2
+    dest: '{{ user_dir }}/{{ folder }}/config/app.toml'
+    mode: '0644'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+  when: app_file is not defined and app_file_base64 is not defined
+
+- name: Base64Decode addrbook.json file
+  ansible.builtin.shell: |
+    set -o pipefail && echo {{ addrbook_file_base64 }} | base64 --decode > {{ user_dir }}/{{ folder }}/config/config.toml && chmod 0644 {{ user_dir }}/{{ folder }}/config/addrbook.json
+  when: addrbook_file_base64 is defined
+  register: addrbook_file_base64_output
+  changed_when: addrbook_file_base64_output.rc != 0
+  args:
+    executable: /usr/bin/bash
+
+- name: Base64Decode node key gz archive
+  ansible.builtin.shell: |
+    set -o pipefail && echo {{ node_key_file_archive_gz_base64 }} | base64 --decode > {{ user_dir }}/key-storage/key.tar.gz
+  when: node_key_file_archive_gz_base64 is defined
+  register: node_key_file_archive_gz_base64_output
+  changed_when: node_key_file_archive_gz_base64_output.rc != 0
+  args:
+    executable: /usr/bin/bash
+
+- name: Untar gz node key gz archive
+  ansible.builtin.shell: |
+    cd {{ user_dir }}/key-storage/ && tar -xzf key.tar.gz
+  when: node_key_file_archive_gz_base64 is defined
+  register: node_key_file_archive_gz_base64_untar_output
+  changed_when: node_key_file_archive_gz_base64_untar_output.rc != 0
+
+- name: Update minimum gas price on config file
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/app.toml'
+    regexp: ^minimum-gas-prices =
+    line: minimum-gas-prices = "{{ minimum_gas_price }}"
+    state: present
+  when: minimum_gas_price is defined
+
+- name: Regular genesis download
+  ansible.builtin.include_tasks: genesis_default.yml
+  when: genesis_processing is undefined
+
+- name: Zip genesis download
+  ansible.builtin.include_tasks: genesis_zip.yml
+  when: genesis_processing is defined and genesis_processing == "zip"
+
+- name: Gz genesis download
+  ansible.builtin.include_tasks: genesis_gz.yml
+  when: genesis_processing is defined and genesis_processing == "gz"
+
+- name: Targz genesis download
+  ansible.builtin.include_tasks: genesis_targz.yml
+  when: genesis_processing is defined and genesis_processing == "targz"
