@@ -57,7 +57,9 @@
   ansible.builtin.file:
     path: '{{ user_dir }}/{{ folder }}/data'
     state: directory
-    mode: '0644'
+    mode: '0755'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
 
 - name: Test
   ansible.builtin.shell: |

@@ -1,12 +1,39 @@
 ---
 
 - name: Cleanup genesis
+  become: true
   ansible.builtin.file:
-    path: '{{ user_dir }}/{{ folder }}/config/genesis.json'
+    path: '{{ user_dir }}/{{ folder }}/config'
     state: absent
 
+- name: Create config dir
+  ansible.builtin.file:
+    path: '{{ user_dir }}/{{ folder }}/config'
+    state: directory
+    mode: '0755'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+
+- name: Template config file
+  ansible.builtin.template:
+    src: config.toml.j2
+    dest: '{{ user_dir }}/{{ folder }}/config/config.toml'
+    mode: '0644'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+
+
+- name: Template app file
+  ansible.builtin.template:
+    src: app.toml.j2
+    dest: '{{ user_dir }}/{{ folder }}/config/app.toml'
+    mode: '0644'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+  when: app_file is not defined and app_file_base64 is not defined
+
 - name: Initialize Node
-  ansible.builtin.command: '{{ user_dir }}/{{ folder }}/bin/{{ daemon }} init {{ node_name }} --chain-id {{ chain_id }}'
+  ansible.builtin.shell: '{{ user_dir }}/{{ folder }}/bin/{{ daemon }} init {{ node_name }} --chain-id {{ chain_id }}' # noqa: command-instead-of-shell
   register: output
   changed_when: output.rc != 0
 
@@ -15,6 +42,8 @@
     url: '{{ config_file }}'
     dest: '{{ user_dir }}/{{ folder }}/config/config.toml'
     mode: '0644'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
   when: config_file is defined
 
 - name: Download app file
@@ -48,31 +77,6 @@
   changed_when: app_file_base64_output.rc != 0
   args:
     executable: /usr/bin/bash
-
-
-- name: Create config dir
-  ansible.builtin.file:
-    path: '{{ user_dir }}/{{ folder }}/config'
-    state: directory
-    mode: '0644'
-
-- name: Template config file
-  ansible.builtin.template:
-    src: config.toml.j2
-    dest: '{{ user_dir }}/{{ folder }}/config/config.toml'
-    mode: '0644'
-    owner: '{{ ansible_user }}'
-    group: '{{ ansible_user }}'
-
-
-- name: Template app file
-  ansible.builtin.template:
-    src: app.toml.j2
-    dest: '{{ user_dir }}/{{ folder }}/config/app.toml'
-    mode: '0644'
-    owner: '{{ ansible_user }}'
-    group: '{{ ansible_user }}'
-  when: app_file is not defined and app_file_base64 is not defined
 
 - name: Base64Decode addrbook.json file
   ansible.builtin.shell: |

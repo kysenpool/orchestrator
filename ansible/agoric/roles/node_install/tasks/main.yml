@@ -116,6 +116,7 @@
             state: present
 
         - name: Chown node_modules
+          become: true
           ansible.builtin.file:
             path: '{{ user_dir }}/{{ folder }}/node_modules'
             owner: '{{ ansible_user }}'
