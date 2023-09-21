@@ -1,11 +1,16 @@
 ---
 - name: Stop node process
   become: true
-  ansible.builtin.systemd:
-    name: '{{ network }}'
-    state: stopped
-    enabled: false
+  ansible.builtin.command: systemctl stop agoric.service # noqa: command-instead-of-module
   ignore_errors: true
+  changed_when: true
+  register: ignore_errors_register
+
+- name: Disable service
+  become: true
+  ansible.builtin.command: systemctl disable agoric.service # noqa: command-instead-of-module
+  ignore_errors: true
+  changed_when: true
   register: ignore_errors_register
 
 - name: Remove project git folder
@@ -14,6 +19,7 @@
     state: absent
 
 - name: Remove node data folder
+  become: true
   ansible.builtin.file:
     path: '{{ user_dir }}/{{ folder }}'
     state: absent
@@ -60,3 +66,17 @@
     user: '{{ ansible_user }}'
     name: '{{ network }} resync'
     state: absent
+
+- name: Reload systemd
+  become: true
+  ansible.builtin.command: systemctl daemon-reload # noqa: command-instead-of-module
+  ignore_errors: true
+  changed_when: true
+  register: ignore_errors_register
+
+- name: Reset failed systemd
+  become: true
+  ansible.builtin.command: systemctl reset-failed # noqa: command-instead-of-module
+  ignore_errors: true
+  changed_when: true
+  register: ignore_errors_register
