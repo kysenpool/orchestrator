@@ -12,3 +12,24 @@
     owner: '{{ ansible_user }}'
     group: '{{ ansible_user }}'
     mode: '0700'
+
+- name: Activate state_sync
+  ansible.builtin.shell: '{{ user_dir }}/state_sync/{{ network }}.sh'
+  args:
+    executable: /usr/bin/bash
+  register: activate_state_sync_output
+  changed_when: activate_state_sync_output.rc != 0
+
+- name: Enable state_sync
+  ansible.builtin.replace:
+    path: '{{ user_dir }}/{{ folder }}/config/config.toml'
+    regexp: 'enable = false'
+    replace: 'enable = true'
+  when: activate_state_sync | default(false) | bool
+
+- name: Disable state_sync
+  ansible.builtin.replace:
+    path: '{{ user_dir }}/{{ folder }}/config/config.toml'
+    regexp: 'enable = true'
+    replace: 'enable = false'
+  when: not activate_state_sync | default(false) | bool

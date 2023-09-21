@@ -19,8 +19,8 @@
     PATH: '{{ path }}'
     GOPATH: '{{ user_dir }}/go'
   when: skip_version is defined and (type == "main" or type == "test")
-  register: my_output
-  changed_when: my_output.rc != 0
+  register: skip_replace_tendermint_output
+  changed_when: skip_replace_tendermint_output.rc != 0
 
 - name: Install node
   ansible.builtin.command: '{{ item }}'

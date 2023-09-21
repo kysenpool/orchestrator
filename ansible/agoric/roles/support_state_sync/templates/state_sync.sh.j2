@@ -1,10 +1,6 @@
 #!/bin/bash
 
-{% if type == 'test' or type == 'testrelay' %}
-SNAP_RPC="https://{{ network }}-testnet-rpc.polkachu.com:443"
-{% else %}
-SNAP_RPC="https://{{ network }}-rpc.polkachu.com:443"
-{% endif %}
+SNAP_RPC="https://{{ network }}-rpc.agoric.net:443"
 
 LATEST_HEIGHT=$(curl -s $SNAP_RPC/block | jq -r .result.block.header.height); \
 BLOCK_HEIGHT=$((LATEST_HEIGHT - 2000)); \
