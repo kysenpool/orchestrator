@@ -1,0 +1,10 @@
+---
+
+- name: Regular genesis download
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl https://emerynet.rpc.agoric.net/genesis | jq .result.genesis > $HOME/.agoric/config/genesis.json
+  register: genesis_download_output
+  changed_when: genesis_download_output.rc != 0
+  args:
+    executable: /usr/bin/bash

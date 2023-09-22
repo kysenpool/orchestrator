@@ -1,0 +1,158 @@
+---
+#  npm install --global yarn # Install yarn for package management
+#  git clone --branch community-dev https://github.com/Agoric/agoric-sdk # Clone the "community-dev" branch
+#  cd agoric-sdk
+#  yarn install # Asks yarn to install all the dependant node packages
+#  yarn build # Builds the agoric-sdk packages
+#  (cd packages/cosmic-swingset && make) # Builds the cosmic-swingset package
+#  yarn link-cli ~/bin/agoric # Creates an executable script
+#  agoric --version # Prints the version number of the SDK
+
+
+- name: Agoric prerequisites
+  when: protocol == 'agoric'
+  become: true
+  block:
+    - name: Add key
+      ansible.builtin.shell: | # noqa
+        set -o pipefail && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key |gpg --yes --dearmor -o /etc/apt/keyrings/nodesource.gpg
+      register: agoric_prerequisites_add_key_output
+      changed_when: agoric_prerequisites_add_key_output.rc != 0
+      args:
+        executable: /usr/bin/bash
+
+    - name: Sources list
+
+      ansible.builtin.shell: |
+        set -o pipefail && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_18.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+      register: agoric_prerequisites_add_key_sources_list_output
+      changed_when: agoric_prerequisites_add_key_sources_list_output.rc != 0
+      args:
+        executable: /usr/bin/bash
+
+    - name: Install nodejs
+      ansible.builtin.apt:
+        name: nodejs
+        update_cache: yes
+        state: present
+
+    - name: Install yarn
+      ansible.builtin.shell: |
+        npm install --global yarn
+      register: agoric_prerequisites_add_yarn_output
+      changed_when: agoric_prerequisites_add_yarn_output.rc != 0
+
+- name: Install from source
+  become: false
+  when: binary is undefined
+  block:
+    - name: Clone node repo
+      ansible.builtin.git:
+        repo: '{{ repo }}'
+        dest: '{{ user_dir }}/{{ folder }}'
+        version: '{{ node_version }}'
+        update: yes
+        force: yes
+        recursive: no
+
+    - name: Install Agoric node
+      when: protocol == 'agoric'
+      become: false
+      block:
+        - name: Yarn install
+          become: true
+          args:
+            chdir: '{{ user_dir }}/{{ folder }}'
+          ansible.builtin.shell: |
+            yarn install
+          register: yarn_install_output
+          changed_when: yarn_install_output.rc != 0
+        - name: Yarn build
+          become: true
+          args:
+            chdir: '{{ user_dir }}/{{ folder }}'
+          ansible.builtin.shell: |
+            yarn build
+          register: yarn_build_output
+          changed_when: yarn_build_output.rc != 0
+
+        - name: Make cosmic swingset
+          become: true
+          ansible.builtin.shell: |
+            export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin && cd "{{ user_dir }}/{{ folder }}/packages/cosmic-swingset" && make
+          register: cosmic_swingset_output
+          changed_when: cosmic_swingset_output.rc != 0
+
+        - name: Delete a file (or symlink) if it exists
+          ansible.builtin.file:
+            path: "{{ user_dir }}/bin/agoric"
+            state: absent
+
+        - name: Yarn link cli
+          become: false
+          args:
+            chdir: '{{ user_dir }}/{{ folder }}'
+          ansible.builtin.shell: export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin && yarn link-cli ~/bin/agoric
+          register: yarn_link_cli_output
+          changed_when: yarn_link_cli_output.rc != 0
+
+        - name: Profile extend
+          ansible.builtin.lineinfile:
+            path: '{{ user_dir }}/.profile'
+            line: export PATH=$PATH:$HOME/bin
+            state: present
+
+        - name: Create Symbolic link
+          ansible.builtin.file:
+            src: '{{ user_dir }}/{{ folder }}/bin/agd'
+            dest: '{{ user_dir }}/{{ folder }}/bin/agoric'
+            state: link
+            mode: '0700'
+
+        - name: Profile extend
+          ansible.builtin.lineinfile:
+            path: '{{ user_dir }}/.profile'
+            line: 'export PATH={{ user_dir }}/{{ folder }}/bin:$PATH'
+            state: present
+
+        - name: Chown node_modules
+          become: true
+          ansible.builtin.file:
+            path: '{{ user_dir }}/{{ folder }}/node_modules'
+            owner: '{{ ansible_user }}'
+            group: '{{ ansible_user }}'
+            recurse: true
+            mode: '0755'
+
+    - name: Install node
+      ansible.builtin.command: '{{ item }}'
+      args:
+        chdir: '{{ user_dir }}/{{ folder }}'
+      when: protocol != 'agoric'
+      with_items:
+        - make install
+      environment:
+        PATH: '{{ path }}'
+        GOPATH: '{{ user_dir }}/go'
+      register: output
+      changed_when: output.rc != 0
+
+- name: Set binary install exit condition
+  ansible.builtin.set_fact:
+    binary_installed: false
+
+- name: Download pre-installed binary
+  when: binary is defined
+  block:
+    - name: Install from binary zipped
+      ansible.builtin.include_tasks: binary_zip.yml
+      when: binary_processing == "zip"
+
+    - name: Install from binary tar gz
+      ansible.builtin.include_tasks: binary_targz.yml
+      when: binary_processing == "targz"
+
+
+    - name: Install from binary
+      ansible.builtin.include_tasks: binary_default.yml
+      when: binary_processing == "default"

@@ -1,0 +1,123 @@
+---
+- name: Register public ip
+  ansible.builtin.uri:
+    url: https://api.ipify.org?format=json
+  register: public_ip
+
+- name: Set up external address
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/config.toml'
+    regexp: external_address = "
+    line: external_address = "{{ public_ip.json.ip }}:{{ custom_port_prefix }}56"
+    state: present
+
+- name: Enforce tendermint namespace for consistency
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/config.toml'
+    regexp: namespace = "
+    line: namespace = "tendermint"
+    state: present
+
+- name: Adjust config.toml port
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/config.toml'
+    regexp: '{{ item.key }}'
+    line: '{{ item.value }}'
+  loop: '{{ config_port_changes | dict2items }}'
+
+- name: Adjust Inbound Peers
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/config.toml'
+    regexp: max_num_inbound_peers
+    line: max_num_inbound_peers = 80
+
+- name: Adjust Outbound Peers
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/config.toml'
+    regexp: max_num_outbound_peers
+    line: max_num_outbound_peers = 60
+
+- name: Adjust app.toml ports
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/app.toml'
+    regexp: '{{ item.key }}'
+    line: '{{ item.value }}'
+  loop: '{{ app_port_changes | dict2items }}'
+
+- name: Adjust pruning setting for main and backup
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/app.toml'
+    regexp: '{{ item.key }}'
+    line: '{{ item.value }}'
+  loop: '{{ pruning_main_backup | dict2items }}'
+  when: type is defined and (type == 'backup' or type == 'main')
+
+- name: Adjust pruning setting for relayer
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/app.toml'
+    regexp: '{{ item.key }}'
+    line: '{{ item.value }}'
+  loop: '{{ pruning_relayer | dict2items }}'
+  when: type is defined and type == 'relayer'
+
+- name: Adjust pruning setting for test
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/app.toml'
+    regexp: '{{ item.key }}'
+    line: '{{ item.value }}'
+  loop: '{{ pruning_test | dict2items }}'
+  when: type is defined and type == 'test'
+
+- name: Adjust pruning setting for testrelay
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/app.toml'
+    regexp: '{{ item.key }}'
+    line: '{{ item.value }}'
+  loop: '{{ pruning_testrelay | dict2items }}'
+  when: type is defined and type == 'testrelay'
+
+- name: Adjust indexer setting for main and backup
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/config.toml'
+    regexp: indexer = "
+    line: indexer = "null"
+    state: present
+  when: type == 'main' or type == 'backup' or type == 'test'
+
+- name: Enable RPC port for relayer (Firewall will still manage the access to this port)
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/config.toml'
+    regexp: '{{ custom_port_prefix }}57'
+    line: laddr = "tcp://0.0.0.0:{{ custom_port_prefix }}57"
+    state: present
+  when: type == 'relayer' or type == 'testrelay'
+
+- name: Enable API for relayer/test
+  ansible.builtin.replace:
+    path: '{{ user_dir }}/{{ folder }}/config/app.toml'
+    regexp: '# Enable defines if the API(.*)\senable = false'
+    replace: '# Enable defines if the API server should be enabled.\nenable = true'
+  when: type == 'relayer' or type == 'testrelay'
+
+- name: Enable Swagger for relayer/test
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/app.toml'
+    regexp: 'swagger = '
+    line: swagger = true
+    state: present
+  when: type == 'relayer' or type == 'testrelay'
+
+- name: Enable CORS for relayer/test
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/app.toml'
+    regexp: enabled-unsafe-cors =
+    line: enabled-unsafe-cors = true
+    state: present
+  when: type == 'relayer' or type == 'testrelay'
+
+- name: Enable prometheus on the config.toml file
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/{{ folder }}/config/config.toml'
+    regexp: ^prometheus =
+    line: prometheus = true
+    state: present
