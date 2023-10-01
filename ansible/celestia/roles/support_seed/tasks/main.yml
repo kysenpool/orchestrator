@@ -1,0 +1,45 @@
+---
+- name: Open p2p port
+  become: true
+  ansible.builtin.command: ufw allow {{ custom_port_prefix }}56/tcp
+  register: ufw_output
+  changed_when: ufw_output.rc != 0
+
+- name: Create folder
+  ansible.builtin.file:
+    state: directory
+    path: '{{ user_dir }}/seeds/{{ folder }}/config'
+    mode: '0644'
+
+- name: Copy config.toml
+  ansible.builtin.template:
+    src: config.toml.j2
+    dest: '{{ user_dir }}/seeds/{{ folder }}/config/config.toml'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    mode: '0644'
+
+- name: Copy node_key.json
+  ansible.builtin.template:
+    src: node_key.json.j2
+    dest: '{{ user_dir }}/seeds/{{ folder }}/config/node_key.json'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    mode: '0644'
+
+- name: Copy tenderseed service file
+  become: true
+  ansible.builtin.template:
+    src: tenderseed.service.j2
+    dest: /etc/systemd/system/tenderseed_{{ network }}.service
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Start tenderseed service
+  become: true
+  ansible.builtin.systemd:
+    name: tenderseed_{{ network }}
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
