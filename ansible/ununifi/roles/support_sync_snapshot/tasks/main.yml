@@ -1,0 +1,84 @@
+---
+- name: Get url fragment based on mainnet or testnet
+  ansible.builtin.set_fact:
+    url_fragment: "{% if network_type == 'mainnet' %}snapshot{% else %}testnet_snapshot{% endif %}"
+
+- name: Download snapshot to home folder
+  ansible.builtin.get_url:
+    url: '{{ snapshot_url }}'
+    dest: '{{ user_dir }}/{{ snapshot_json_snapshot_name }}'
+    mode: '0644'
+
+- name: Stop node process
+  become: true
+  ansible.builtin.systemd:
+    name: '{{ network }}'
+    state: stopped
+    daemon_reload: yes
+    enabled: yes
+
+- name: Move priv_validator_state.json to a safe location
+  ansible.builtin.command: mv {{ user_dir }}/{{ folder }}/data/priv_validator_state.json {{ user_dir }}/{{ folder }}
+  register: mv_output
+  changed_when: mv_output.rc != 0
+
+- name: Unsafe reset
+  args:
+    executable: /usr/bin/bash
+  ansible.builtin.shell: '{{ user_dir }}/{{ folder }}/bin/{{ daemon }} tendermint unsafe-reset-all --home $HOME/{{ folder }} --keep-addr-book'
+  register: output
+  changed_when: output.rc != 0
+
+- name: Extract snapshot
+  ansible.builtin.shell: set -o pipefail && lz4 -c -d $HOME/{{ snapshot_json_snapshot_name }} | tar -x -C $HOME/{{ folder }}
+  register: output
+  changed_when: output.rc != 0
+  args:
+    executable: /usr/bin/bash
+
+- name: Move priv_validator_state.json back
+  ansible.builtin.command: mv {{ user_dir }}/{{ folder }}/priv_validator_state.json {{ user_dir }}/{{ folder }}/data/
+  register: output
+  changed_when: output.rc != 0
+
+- name: Pause for 5 seconds
+  ansible.builtin.pause:
+    seconds: 5
+
+- name: Start node process
+  become: true
+  ansible.builtin.systemd:
+    name: '{{ network }}'
+    state: started
+    daemon_reload: yes
+    enabled: yes
+
+- name: Pause for 10 seconds
+  ansible.builtin.pause:
+    seconds: 10
+
+- name: Delete the downloaded snapshot file
+  ansible.builtin.file:
+    path: '{{ user_dir }}/{{ snapshot_json_snapshot_name }}'
+    state: absent
+
+- name: Prepare snapshot bin directory
+  ansible.builtin.file:
+    path: '{{ user_dir }}/{{ folder }}/cosmovisor/upgrades/{{ snapshot_json_snapshot_name }}/bin/'
+    state: directory
+    mode: '0755'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+
+- name: Create Symbolic link
+  ansible.builtin.file:
+    src: '{{ user_dir }}/{{ folder }}/bin/agd'
+    dest: '{{ user_dir }}/{{ folder }}/cosmovisor/upgrades/{{ snapshot_json_snapshot_name }}/bin/agd'
+    state: link
+    mode: '0700'
+
+- name: Ensure it is running
+  ansible.builtin.uri:
+    url: http://localhost:{{ custom_port_prefix }}61
+    method: GET
+    status_code: 200

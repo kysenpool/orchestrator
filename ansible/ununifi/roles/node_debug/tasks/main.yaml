@@ -1,0 +1,4 @@
+---
+- name: Ansible.builtin.debug
+  ansible.builtin.debug:
+    var: network

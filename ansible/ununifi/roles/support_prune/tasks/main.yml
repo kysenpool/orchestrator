@@ -1,0 +1,14 @@
+---
+- name: Create directory
+  ansible.builtin.file:
+    path: '{{ user_dir }}/prune'
+    state: directory
+    mode: '0755'
+
+- name: Copy prune script
+  ansible.builtin.template:
+    src: prune.sh.j2
+    dest: '{{ user_dir }}/prune/{{ network }}.sh'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    mode: '0700'

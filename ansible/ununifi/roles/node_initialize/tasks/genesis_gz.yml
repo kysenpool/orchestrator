@@ -1,0 +1,19 @@
+---
+- name: Download genesis gz file
+  ansible.builtin.get_url:
+    url: '{{ genesis }}'
+    dest: /tmp/genesis.json.gz
+    mode: '0700'
+
+- name: Unarchive genesis file # noqa
+  ansible.builtin.command: gunzip /tmp/genesis.json.gz -f # noqa
+  register: output # noqa
+  changed_when: output.rc != 0 # noqa
+
+
+- name: Copy the genesis file
+  ansible.builtin.copy:
+    remote_src: true
+    src: /tmp/genesis.json
+    mode: 0600
+    dest: '{{ user_dir }}/{{ folder }}/config/genesis.json'

@@ -1,0 +1,13 @@
+---
+- name: Download binary file
+  ansible.builtin.get_url:
+    url: '{{ binary }}'
+    dest: /tmp/{{ daemon }}
+    mode: '0755'
+
+- name: Copy binary
+  ansible.builtin.copy:
+    remote_src: true
+    src: /tmp/{{ daemon }}
+    dest: '{{ user_dir }}/go/bin/{{ daemon }}'
+    mode: '0755'

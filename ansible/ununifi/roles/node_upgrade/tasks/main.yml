@@ -1,0 +1,68 @@
+---
+- name: Clone node repo
+  ansible.builtin.git:
+    repo: '{{ repo }}'
+    dest: '{{ user_dir }}/{{ network }}'
+    version: '{{ node_version }}'
+    update: yes
+    force: yes
+    recursive: no
+
+- name: Skip replace tendermint
+  ansible.builtin.command: '{{ item }}'
+  with_items:
+    - go mod edit -replace github.com/tendermint/tendermint=github.com/skip-mev/mev-tendermint@{{ skip_version }}
+    - go mod tidy
+  args:
+    chdir: '{{ user_dir }}/{{ network }}'
+  environment:
+    PATH: '{{ path }}'
+    GOPATH: '{{ user_dir }}/go'
+  when: skip_version is defined and (type == "main" or type == "test")
+  register: skip_replace_tendermint_output
+  changed_when: skip_replace_tendermint_output.rc != 0
+
+- name: Install node
+  ansible.builtin.command: '{{ item }}'
+  args:
+    chdir: '{{ user_dir }}/{{ network }}'
+  with_items:
+    - make install
+  environment:
+    PATH: '{{ path }}'
+    GOPATH: '{{ user_dir }}/go'
+  register: output
+  changed_when: output.rc != 0
+
+- name: Create new directory
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+    mode: '0755'
+  with_items:
+    - '{{ user_dir }}/{{ folder }}/cosmovisor/upgrades/{{ upgrade_folder }}/bin'
+  when: upgrade_folder is defined
+
+- name: Copy binary file to cosmovisor upgrade folder
+  ansible.builtin.copy:
+    src: '{{ user_dir }}/go/bin/{{ daemon }}'
+    dest: '{{ user_dir }}/{{ folder }}/cosmovisor/upgrades/{{ upgrade_folder }}/bin'
+    remote_src: true
+    mode: '0755'
+  when: upgrade_folder is defined
+
+- name: Copy binary file to cosmovisor genesis folder
+  ansible.builtin.copy:
+    src: '{{ user_dir }}/go/bin/{{ daemon }}'
+    dest: '{{ user_dir }}/{{ folder }}/cosmovisor/genesis/bin'
+    remote_src: true
+    mode: '0755'
+  when: upgrade_folder is not defined
+
+- name: Start cosmovisor service
+  become: true
+  ansible.builtin.systemd:
+    name: '{{ network }}'
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
