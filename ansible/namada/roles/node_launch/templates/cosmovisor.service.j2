@@ -1,0 +1,16 @@
+[Unit]
+Description=namada
+After=network-online.target
+[Service]
+User=$USER
+WorkingDirectory=$HOME/.local/share/namada
+Environment=CMT_LOG_LEVEL=p2p:none,pex:error
+Environment=NAMADA_CMT_STDOUT=true
+ExecStart=/usr/local/bin/namada node ledger run
+StandardOutput=syslog
+StandardError=syslog
+Restart=always
+RestartSec=10
+LimitNOFILE=65535
+[Install]
+WantedBy=multi-user.target

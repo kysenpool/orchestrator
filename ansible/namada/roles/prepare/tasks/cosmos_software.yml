@@ -1,0 +1,65 @@
+---
+- name: Install apt packages
+  ansible.builtin.apt:
+    name: '{{ item }}'
+    state: present
+    update_cache: yes
+  loop:
+    - make
+    - git-core
+    - libssl-dev
+    - pkg-config
+    - libclang-12-dev
+    - build-essential
+    - protobuf-compiler
+    - jq
+    - chrony
+    - lz4
+
+- name: Download go
+  ansible.builtin.get_url:
+    url: https://golang.org/dl/go{{ go_version }}.linux-amd64.tar.gz
+    dest: /tmp/go{{ go_version }}.linux-amd64.tar.gz
+    mode: '0700'
+
+- name: Unarchive go
+  ansible.builtin.unarchive:
+    src: /tmp/go{{ go_version }}.linux-amd64.tar.gz
+    remote_src: yes
+    dest: /usr/local/
+    owner: root
+    group: root
+    mode: '0755'
+
+
+- name: Change go folder permission
+  ansible.builtin.file:
+    path: '{{ user_dir }}/go'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    recurse: true
+    mode: '0755'
+
+- name: Copy .profile
+  ansible.builtin.template:
+    src: profile.j2
+    dest: '{{ user_dir }}/.profile'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    mode: '0600'
+
+- name: Add DAEMON_NAME line in .profile
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/.profile'
+    regexp: export DAEMON_NAME=
+    line: export DAEMON_NAME={{ daemon }}
+    state: present
+  when: daemon is defined
+
+- name: Add DAEMON_HOME line in .profile
+  ansible.builtin.lineinfile:
+    path: '{{ user_dir }}/.profile'
+    regexp: export DAEMON_HOME=
+    line: export DAEMON_HOME=$HOME/{{ folder }}
+    state: present
+  when: folder is defined

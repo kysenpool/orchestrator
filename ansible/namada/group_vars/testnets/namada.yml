@@ -1,0 +1,15 @@
+---
+network: namada
+folder: .namada
+daemon: namada
+chain_id: public-testnet-14.5d79b6958580
+node_version: 0.27.0
+repo: https://github.com/anoma/namada
+genesis: https://emerynet.rpc.agoric.net/genesis
+peers: fb86a0993c694c981a28fa1ebd1fd692f345348b@34.171.162.87:26656
+seeds: 0f04c4610b7511a64b8644944b907416db568590@35.222.138.81:26656
+custom_port_prefix: 144
+
+# [Optional] Snapshot
+snapshot_hour: 4
+snapshot_minute: 30

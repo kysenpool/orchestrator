@@ -16,3 +16,6 @@
 build/
 */build/
 out/
+
+inventory.ini
+inventory_remote*

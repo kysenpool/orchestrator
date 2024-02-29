@@ -1,0 +1,28 @@
+---
+- name: Prepare
+  hosts: '{{ target | default([])}}'
+  become: true
+  gather_facts: false
+  vars_files:
+    - '{{ var_file }}'
+  roles:
+    - prepare
+
+- name: Main
+  hosts: '{{ target| default([]) }}'
+  gather_facts: false
+  vars_files:
+    - '{{ var_file }}'
+  roles:
+    - node_install
+    - node_initialize
+    - node_configure
+
+- name: Launch
+  hosts: '{{ target| default([]) }}'
+  gather_facts: false
+  vars_files:
+    - '{{ var_file }}'
+  roles:
+    - role: node_launch
+      when: launch | default(false) | bool == true
