@@ -1,0 +1,13 @@
+---
+
+
+- name: Regular genesis download
+  ansible.builtin.get_url:
+    url: '{{ genesis }}'
+    dest: '{{ user_dir }}/{{ folder }}/config/genesis.json.tmp'
+    mode: '0644'
+
+- name: Place genesis
+  ansible.builtin.command: cp {{ user_dir }}/{{ folder }}/config/genesis.json.tmp  {{ user_dir }}/{{ folder }}/config/genesis.json
+  register: output # noqa
+  changed_when: output.rc != 0 # noqa

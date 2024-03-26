@@ -1,0 +1,39 @@
+---
+- name: Prepare
+  hosts: '{{ target | default([])}}'
+  become: true
+  gather_facts: false
+  vars_files:
+    - '{{ var_file }}'
+  roles:
+    - prepare
+
+- name: Main
+  hosts: '{{ target| default([]) }}'
+  gather_facts: false
+  vars_files:
+    - '{{ var_file }}'
+  roles:
+    - node_install
+    - node_initialize
+    - node_configure
+
+- name: State sync
+  hosts: '{{ target| default([]) }}'
+  gather_facts: false
+  vars_files:
+    - '{{ var_file }}'
+  roles:
+    - role: support_state_sync
+      vars:
+        activate_state_sync: '{{ state_sync | default(false) | bool }}'
+      when: state_sync | default(false) | bool == true
+
+- name: Launch
+  hosts: '{{ target| default([]) }}'
+  gather_facts: false
+  vars_files:
+    - '{{ var_file }}'
+  roles:
+    - role: node_launch
+      when: launch | default(false) | bool == true
