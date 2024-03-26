@@ -1,0 +1,46 @@
+---
+
+- name: Install from source
+  become: false
+  when: binary is undefined
+  block:
+    - name: Clone node repo
+      ansible.builtin.git:
+        repo: '{{ repo }}'
+        dest: '{{ user_dir }}/govgen'
+        version: '{{ node_version }}'
+        update: yes
+        force: yes
+        recursive: no
+
+    - name: Install node
+      ansible.builtin.command: '{{ item }}'
+      args:
+        chdir: '{{ user_dir }}/govgen'
+      with_items:
+        - make install
+      environment:
+        PATH: '{{ path }}'
+        GOPATH: '{{ user_dir }}/go'
+      register: output
+      changed_when: output.rc != 0
+
+- name: Set binary install exit condition
+  ansible.builtin.set_fact:
+    binary_installed: false
+
+- name: Download pre-installed binary
+  when: binary is defined
+  block:
+    - name: Install from binary zipped
+      ansible.builtin.include_tasks: binary_zip.yml
+      when: binary_processing == "zip"
+
+    - name: Install from binary tar gz
+      ansible.builtin.include_tasks: binary_targz.yml
+      when: binary_processing == "targz"
+
+
+    - name: Install from binary
+      ansible.builtin.include_tasks: binary_default.yml
+      when: binary_processing == "default"

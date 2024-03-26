@@ -1,0 +1,7 @@
+---
+- name: Prepare
+  hosts: '{{ target| default([]) }}'
+  become: true
+  gather_facts: false
+  roles:
+    - prepare
